@@ -145,10 +145,15 @@ RUN if [ "$MODEL_TYPE" = "flux1-dev-fp8" ]; then \
       wget -q -O models/checkpoints/flux1-dev-fp8.safetensors https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors; \
     fi
 
+# Z-Image-Turbo: split into separate RUNs so build logs show which download failed
 RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
-      wget -q -O models/clip/qwen_3_4b.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors && \
-      wget -q -O models/unet/z_image_turbo_bf16.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors && \
-      wget -q -O models/vae/ae.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors && \
+      wget -O models/clip/qwen_3_4b.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors; \
+    fi
+RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
+      wget -O models/unet/z_image_turbo_bf16.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors; \
+    fi
+RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
+      wget -O models/vae/ae.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors; \
     fi
 
 # Stage 3: Final image
