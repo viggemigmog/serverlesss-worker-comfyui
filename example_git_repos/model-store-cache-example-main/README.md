@@ -1,6 +1,6 @@
 # Runpod Cached Model Worker
 
-A Runpod Serverless worker that serves a Hugging Face text generation model using the [model caching](https://docs.runpod.io/serverless/endpoints/manage-endpoints#model-caching) feature. The model is pre-downloaded to a network volume and loaded at startup in offline mode, eliminating cold-start downloads.
+A Runpod Serverless worker that serves a Hugging Face text generation model using the [model caching](https://docs.runpod.io/serverless/endpoints/model-caching) feature. The model is pre-downloaded to a network volume and loaded at startup in offline mode, eliminating cold-start downloads.
 
 Defaults to [microsoft/Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct) but works with any Hugging Face text generation model available through the model caching feature.
 
@@ -8,7 +8,7 @@ Defaults to [microsoft/Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/
 
 1. Runpod's model caching feature downloads the model to `/runpod-volume/huggingface-cache/hub/` before the worker starts.
 2. The handler resolves the local snapshot path from the cache directory.
-3. The model and tokenizer aree loaded once at startup in offline mode (`HF_HUB_OFFLINE=1`).
+3. The model and tokenizer are loaded once at startup in offline mode (`HF_HUB_OFFLINE=1`).
 4. Incoming requests are processed using a `transformers` text generation pipeline.
 
 ## Files
@@ -131,5 +131,5 @@ If the cache directory is empty or missing, make sure you added the model in the
 ## Related
 
 - [Deploy a cached model](https://docs.runpod.io/tutorials/serverless/model-caching-text) - Full tutorial for this worker.
-- [Model caching](https://docs.runpod.io/serverless/endpoints/manage-endpoints#model-caching) - How model caching works on Runpod Serverless.
+- [Model caching](https://docs.runpod.io/serverless/endpoints/model-caching) - How model caching works on Runpod Serverless.
 - [Runpod Serverless](https://docs.runpod.io/serverless/overview) - Serverless overview.
