@@ -74,8 +74,8 @@ WORKDIR /
 RUN uv pip install runpod requests websocket-client
 
 # Add application code and scripts
-ADD src/start.sh src/network_volume.py src/setup_cached_models.py handler.py test_input.json ./
-RUN chmod +x /start.sh
+ADD src/start.sh src/network_volume.py src/setup_cached_models.py handler.py ./
+RUN chmod +x /start.sh /setup_cached_models.py
 
 # Add script to install custom nodes
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
@@ -88,18 +88,6 @@ ENV PIP_NO_INPUT=1
 COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
 RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 
-# Custom nodes from registry (comfy-node-install uses comfy node install under the hood)
-RUN comfy-node-install comfyui-easy-use rgthree-comfy seedvr2_videoupscaler@2.5.24
-
-# Custom nodes not on registry: install via git clone + pip
-RUN git clone https://github.com/attome-ai/Comfyui_Attome_S3 /comfyui/custom_nodes/Comfyui_Attome_S3 && \
-    cd /comfyui/custom_nodes/Comfyui_Attome_S3 && \
-    pip install -r requirements.txt
-
-RUN git clone https://github.com/felixszeto/ComfyUI-RequestNodes /comfyui/custom_nodes/ComfyUI-RequestNodes && \
-    cd /comfyui/custom_nodes/ComfyUI-RequestNodes && \
-    pip install -r requirements.txt || true
-
 # Set the default command to run when starting the container
 CMD ["/start.sh"]
 
@@ -107,14 +95,14 @@ CMD ["/start.sh"]
 FROM base AS downloader
 
 ARG HUGGINGFACE_ACCESS_TOKEN
-# Set default model type if none is provided (use z-image-turbo for Z-Image-Turbo + cached unet)
-ARG MODEL_TYPE=z-image-turbo
+# Set default model type if none is provided
+ARG MODEL_TYPE=none
 
 # Change working directory to ComfyUI
 WORKDIR /comfyui
 
 # Create necessary directories upfront
-RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/model_patches
+RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/model_patches models/mmaudio models/diffusion_models models/text_encoders
 
 # Download checkpoints/vae/unet/clip models to include in image based on model type
 RUN if [ "$MODEL_TYPE" = "sdxl" ]; then \
@@ -146,9 +134,10 @@ RUN if [ "$MODEL_TYPE" = "flux1-dev-fp8" ]; then \
     fi
 
 RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
-      wget -q -O models/clip/qwen_3_4b.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors && \
-      wget -q -O models/unet/z_image_turbo_bf16.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors && \
+      wget -q -O models/text_encoders/qwen_3_4b.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors && \
+      wget -q -O models/diffusion_models/z_image_turbo_bf16.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors && \
       wget -q -O models/vae/ae.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors && \
+      wget -q -O models/model_patches/Z-Image-Turbo-Fun-Controlnet-Union.safetensors https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union.safetensors; \
     fi
 
 # Stage 3: Final image

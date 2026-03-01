@@ -105,29 +105,3 @@ RunPod offers a seamless way to deploy directly from your GitHub repository cont
 5.  **Deploy:** RunPod will clone the repository, build the image from your specified branch and Dockerfile, push it to a temporary registry, and deploy the endpoint.
 
 Every `git push` to the configured branch will automatically trigger a new build and update your RunPod endpoint. For more details, refer to the [RunPod GitHub Integration Documentation](https://docs.runpod.io/serverless/github-integration).
-
-### Deploying this repo (Z-Image-Turbo + cached model)
-
-This repository is set up for Z-Image-Turbo with RunPod [model caching](https://docs.runpod.io/serverless/endpoints/model-caching): the **unet** (DiT) is loaded from the cache at worker start; text encoder, VAE, LoRAs, and custom nodes are installed in the image.
-
-**1. Build the image**
-
-- **Default:** The Dockerfile uses `MODEL_TYPE=z-image-turbo` by default, so the image includes Z-Image-Turbo text encoder, VAE, and model patches (unet comes from cache at runtime).
-- **Manual build:** From the repo root:
-  ```bash
-  docker build --platform linux/amd64 --build-arg MODEL_TYPE=z-image-turbo -t your-registry/worker-comfyui-zimage:latest .
-  ```
-- **RunPod GitHub deploy:** When you create the endpoint from this repo, the build uses the default `MODEL_TYPE=z-image-turbo`. If your RunPod project has a **Build arguments** / **Docker build args** field, you can set `MODEL_TYPE=z-image-turbo` there (or leave it unset to use the default).
-
-**2. Configure the endpoint**
-
-- In the RunPod endpoint configuration, open the **Model** section and set the cached model to:
-  ```text
-  Tongyi-MAI/Z-Image-Turbo
-  ```
-  This makes RunPod pre-download the model to the cache; at startup the worker symlinks the transformer weights into `models/unet/` and logs `[cached-model] Using cached model: Tongyi-MAI/Z-Image-Turbo`.
-- (Optional) If the model is gated, add your Hugging Face access token in the same **Model** section.
-
-**3. Create template and endpoint**
-
-- Create a template (or use “Start from GitHub Repo”) with the image from step 1, then create the endpoint as in [Create your endpoint](#create-your-endpoint). Ensure **Model** is set as in step 2 so the cached model is used.

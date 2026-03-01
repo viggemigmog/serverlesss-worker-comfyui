@@ -25,7 +25,7 @@ This project allows you to run ComfyUI workflows as a serverless API endpoint on
 
 ## Quickstart
 
-1.  🐳 Choose one of the [available Docker images](#available-docker-images) for your serverless endpoint (e.g., `runpod/worker-comfyui:<version>-sd3`), or **deploy from this repo** (Z-Image-Turbo + cached model + custom nodes) — see [Deployment Guide → Deploying this repo](docs/deployment.md#deploying-this-repo-z-image-turbo--cached-model).
+1.  🐳 Choose one of the [available Docker images](#available-docker-images) for your serverless endpoint (e.g., `runpod/worker-comfyui:<version>-sd3`).
 2.  📄 Follow the [Deployment Guide](docs/deployment.md) to set up your RunPod template and endpoint.
 3.  ⚙️ Optionally configure the worker (e.g., for S3 upload) using environment variables - see the full [Configuration Guide](docs/configuration.md).
 4.  🧪 Pick an example workflow from [`test_resources/workflows/`](./test_resources/workflows/) or [get your own](#getting-the-workflow-json).
