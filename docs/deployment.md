@@ -108,7 +108,7 @@ Every `git push` to the configured branch will automatically trigger a new build
 
 ### Deploying this repo (Z-Image-Turbo + cached model)
 
-This repository is set up for Z-Image-Turbo with RunPod [model caching](https://docs.runpod.io/serverless/endpoints/model-caching): **unet** (and with [viggemimog/zimageturbo-minimal](https://huggingface.co/viggemimog/zimageturbo-minimal), **clip**, **vae**, **loras**) are loaded from the cache at worker start. See [Cached models](https://docs.runpod.io/serverless/endpoints/model-caching) and [Deploy a cached model](https://docs.runpod.io/tutorials/serverless/model-caching-text).
+This repository is set up for Z-Image-Turbo with RunPod [model caching](https://docs.runpod.io/serverless/endpoints/model-caching): the **unet** (DiT) is loaded from the cache at worker start; text encoder, VAE, LoRAs, and custom nodes are installed in the image.
 
 **1. Build the image**
 
@@ -121,13 +121,11 @@ This repository is set up for Z-Image-Turbo with RunPod [model caching](https://
 
 **2. Configure the endpoint**
 
-- In the RunPod endpoint configuration, open the **Model** section and set the cached model to one of:
-  - **Tongyi-MAI/Z-Image-Turbo** — RunPod pre-downloads the model; at startup the worker symlinks the transformer weights into `models/unet/` and logs `[cached-model] Using cached model: Tongyi-MAI/Z-Image-Turbo`.
-  - **viggemimog/zimageturbo-minimal** — [Minimal bundle](https://huggingface.co/viggemimog/zimageturbo-minimal) with all files at repo root. At startup the worker symlinks:
-    - `zimage_turbo.safetensors` → `models/unet/`
-    - `realistic_snapshot.safetensors`, `mystic_xxx.safetensors` → `models/loras/`
-    - `qwen_3_4b.safetensors` → `models/clip/`
-    - `ae.safetensors` → `models/vae/`
+- In the RunPod endpoint configuration, open the **Model** section and set the cached model to:
+  ```text
+  Tongyi-MAI/Z-Image-Turbo
+  ```
+  This makes RunPod pre-download the model to the cache; at startup the worker symlinks the transformer weights into `models/unet/` and logs `[cached-model] Using cached model: Tongyi-MAI/Z-Image-Turbo`.
 - (Optional) If the model is gated, add your Hugging Face access token in the same **Model** section.
 
 **3. Create template and endpoint**
