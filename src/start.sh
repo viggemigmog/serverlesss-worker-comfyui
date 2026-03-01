@@ -7,7 +7,7 @@ export LD_PRELOAD="${TCMALLOC}"
 # Ensure ComfyUI-Manager runs in offline network mode inside the container
 comfy-manager-set-mode offline || echo "worker-comfyui - Could not set ComfyUI-Manager network_mode" >&2
 
-# Setup cached model (Z-Image-Turbo) from RunPod cache into models/unet
+# Setup cached model (zimageturbo-minimal) from RunPod cache into models/unet, loras, clip, vae
 echo "worker-comfyui: Setting up cached model..."
 python -u /setup_cached_models.py
 

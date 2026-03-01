@@ -1,30 +1,52 @@
 #!/usr/bin/env python3
 """
-Setup script to symlink RunPod's cached Hugging Face model (Z-Image-Turbo)
-into ComfyUI's unet folder.
+Setup script to symlink RunPod's cached Hugging Face model (zimageturbo-minimal)
+into ComfyUI model folders (unet, loras, clip, vae).
 
 RunPod downloads the model to /runpod-volume/huggingface-cache/hub/ when you
-configure the endpoint's Model field. This script symlinks the transformer
-weights into /runpod-volume/models/unet/ so ComfyUI can load them.
+set the endpoint's Model field to the Hugging Face repo. This script symlinks
+each .safetensors file from the cache snapshot into the correct ComfyUI folder.
 
-Reference: https://docs.runpod.io/serverless/endpoints/model-caching
+File mapping (viggemimog/zimageturbo-minimal):
+  - zimage_turbo.safetensors     -> models/unet/
+  - realistic_snapshot.safetensors -> models/loras/
+  - qwen_3_4b.safetensors        -> models/clip/
+  - mystic_xxx.safetensors       -> models/loras/
+  - ae.safetensors              -> models/vae/
+
+References:
+  - https://docs.runpod.io/serverless/endpoints/model-caching
+  - https://docs.runpod.io/tutorials/serverless/model-caching-text
 """
 import os
 import sys
 from pathlib import Path
 
 CACHE_ROOT = Path("/runpod-volume/huggingface-cache/hub")
-COMFYUI_UNET = Path("/runpod-volume/models/unet")
+COMFYUI_BASE = Path("/runpod-volume/models")
 
-# Default model when RunPod Model field is set to Tongyi-MAI/Z-Image-Turbo
-DEFAULT_CACHED_MODEL_ID = "Tongyi-MAI/Z-Image-Turbo"
+# Default model when RunPod Model field is set to this repo
+DEFAULT_CACHED_MODEL_ID = "viggemimog/zimageturbo-minimal"
 
-# Diffusers layout: transformer/ contains the DiT .safetensors
-HF_TRANSFORMER_SUBDIR = "transformer"
+# Cached repo files are at snapshot root. Map filename -> ComfyUI subfolder (under models/).
+# ComfyUI paths from extra_model_paths.yaml: unet, loras, clip, vae.
+FILE_TO_COMFYUI_FOLDER = [
+    ("zimage_turbo.safetensors", "unet"),
+    ("realistic_snapshot.safetensors", "loras"),
+    ("qwen_3_4b.safetensors", "clip"),
+    ("mystic_xxx.safetensors", "loras"),
+    ("ae.safetensors", "vae"),
+]
 
 
 def resolve_snapshot_path(model_id: str) -> Path | None:
-    """Resolve the cached model snapshot directory for a HuggingFace model ID."""
+    """
+    Resolve the cached model snapshot directory for a Hugging Face model ID.
+
+    RunPod stores cached models under CACHE_ROOT with structure:
+      models--{org}--{name}/refs/main, snapshots/{hash}/...
+    See: https://docs.runpod.io/serverless/endpoints/model-caching
+    """
     if "/" not in model_id:
         return None
     org, name = model_id.split("/", 1)
@@ -45,62 +67,52 @@ def resolve_snapshot_path(model_id: str) -> Path | None:
     return None
 
 
-# Filename workflows expect so they see one "Z-Image-Turbo" option; when cache
-# is present we expose the cached file under this name so cache is used first.
-Z_IMAGE_TURBO_UNET_FILENAME = "z_image_turbo_bf16.safetensors"
-
-
-def setup_z_image_turbo_from_cache(model_id: str) -> bool:
+def setup_zimageturbo_minimal_from_cache(model_id: str) -> int:
     """
-    Symlink the cached model's transformer weights into ComfyUI unet folder.
-    Uses the standard filename so ComfyUI/workflows prefer this over the baked-in
-    file in /comfyui/models/unet/. When cache is absent, the baked-in file is
-    used (from the Dockerfile).
-    Returns True if symlinks were created, False otherwise.
+    Symlink each cached file from the snapshot into the correct ComfyUI folder.
+    Returns the number of symlinks created.
     """
     snapshot_path = resolve_snapshot_path(model_id)
-    if not snapshot_path:
-        return False
+    if not snapshot_path or not snapshot_path.is_dir():
+        return 0
 
-    transformer_dir = snapshot_path / HF_TRANSFORMER_SUBDIR
-    if not transformer_dir.exists() or not transformer_dir.is_dir():
-        return False
+    linked = 0
+    for filename, subdir in FILE_TO_COMFYUI_FOLDER:
+        src = snapshot_path / filename
+        if not src.is_file():
+            continue
+        dest_dir = COMFYUI_BASE / subdir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        tgt = dest_dir / filename
+        if tgt.is_symlink():
+            tgt.unlink()
+        if tgt.exists():
+            tgt.unlink()
+        tgt.symlink_to(src)
+        print(f"  [cached-model] Symlinked {filename} -> models/{subdir}/")
+        linked += 1
 
-    COMFYUI_UNET.mkdir(parents=True, exist_ok=True)
-    # Find the main weight file (e.g. diffusion_pytorch_model.safetensors)
-    safetensors = [f for f in transformer_dir.iterdir() if f.is_file() and f.suffix == ".safetensors"]
-    if not safetensors:
-        return False
-
-    src_file = safetensors[0]
-    tgt = COMFYUI_UNET / Z_IMAGE_TURBO_UNET_FILENAME
-    if tgt.is_symlink():
-        tgt.unlink()
-    if tgt.exists():
-        tgt.unlink()
-    tgt.symlink_to(src_file)
-    print(f"  [cached-model] Symlinked cached transformer -> models/unet/{Z_IMAGE_TURBO_UNET_FILENAME} (cache takes precedence over baked-in)")
-    return True
+    return linked
 
 
 def main() -> None:
     model_id = os.environ.get("MODEL_NAME") or os.environ.get("CACHED_MODEL_ID") or DEFAULT_CACHED_MODEL_ID
 
     print("=" * 60)
-    print("RunPod cached model setup (Z-Image-Turbo -> unet)")
+    print("RunPod cached model setup (zimageturbo-minimal -> ComfyUI folders)")
     print("=" * 60)
     print(f"  Cache root: {CACHE_ROOT}")
     print(f"  Model ID:   {model_id}")
 
     if not CACHE_ROOT.exists():
-        print("  [cached-model] Cache directory not present; using baked-in model from image (Dockerfile).")
-        print("  Configure Model in your RunPod endpoint settings to use model caching.")
+        print("  [cached-model] Cache directory not present; using baked-in models from image (Dockerfile).")
+        print("  Set Model in your RunPod endpoint to 'viggemimog/zimageturbo-minimal' to use model caching.")
         print("=" * 60)
         return
 
     snapshot_path = resolve_snapshot_path(model_id)
     if not snapshot_path:
-        print(f"  [cached-model] Cached model not found: {model_id}; using baked-in model from image (Dockerfile).")
+        print(f"  [cached-model] Cached model not found: {model_id}; using baked-in models from image (Dockerfile).")
         if CACHE_ROOT.exists():
             entries = [e.name for e in CACHE_ROOT.iterdir() if e.is_dir()][:5]
             if entries:
@@ -111,10 +123,11 @@ def main() -> None:
     print(f"  [cached-model] Using cached model: {model_id}")
     print(f"  [cached-model] Snapshot path: {snapshot_path}")
 
-    if setup_z_image_turbo_from_cache(model_id):
-        print("  [cached-model] Cached model symlinked to models/unet/ — ComfyUI will use the cached model.")
+    linked = setup_zimageturbo_minimal_from_cache(model_id)
+    if linked:
+        print(f"  [cached-model] Symlinked {linked} file(s) into ComfyUI model folders.")
     else:
-        print("  [cached-model] No transformer files found in cache snapshot; skipping unet symlinks.")
+        print("  [cached-model] No expected files found in cache snapshot; skipping symlinks.")
 
     print("=" * 60)
 
