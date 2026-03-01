@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 # Time to wait between API check attempts in milliseconds
 COMFY_API_AVAILABLE_INTERVAL_MS = 50
-# Maximum number of API check attempts
-COMFY_API_AVAILABLE_MAX_RETRIES = 500
+# Maximum number of API check attempts (500 * 50ms = 25s; 900 = 45s for slow cold starts)
+COMFY_API_AVAILABLE_MAX_RETRIES = int(os.environ.get("COMFY_API_AVAILABLE_MAX_RETRIES", "900"))
 # Websocket reconnection behaviour (can be overridden through environment variables)
 # NOTE: more attempts and diagnostics improve debuggability whenever ComfyUI crashes mid-job.
 #   • WEBSOCKET_RECONNECT_ATTEMPTS sets how many times we will try to reconnect.
@@ -188,7 +188,7 @@ def validate_input(job_input):
     }, None
 
 
-def check_server(url, retries=500, delay=50):
+def check_server(url, retries=None, delay=50):
     """
     Check if a server is reachable via HTTP GET request
 
@@ -200,6 +200,8 @@ def check_server(url, retries=500, delay=50):
     Returns:
     bool: True if the server is reachable within the given number of retries, otherwise False
     """
+    if retries is None:
+        retries = COMFY_API_AVAILABLE_MAX_RETRIES
 
     print(f"worker-comfyui - Checking API server at {url}...")
     for i in range(retries):
