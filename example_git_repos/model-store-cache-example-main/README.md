@@ -8,7 +8,7 @@ Defaults to [microsoft/Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/
 
 1. Runpod's model caching feature downloads the model to `/runpod-volume/huggingface-cache/hub/` before the worker starts.
 2. The handler resolves the local snapshot path from the cache directory.
-3. The model and tokenizer are loaded once at startup in offline mode (`HF_HUB_OFFLINE=1`).
+3. The model and tokenizer aree loaded once at startup in offline mode (`HF_HUB_OFFLINE=1`).
 4. Incoming requests are processed using a `transformers` text generation pipeline.
 
 ## Files
