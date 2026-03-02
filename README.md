@@ -78,7 +78,7 @@ Use the `/runsync` endpoint for synchronous requests that wait for the job to co
 
 The following tables describe the fields within the `input` object:
 
-| Field Path                | Type   | Required | Description                                                                                                                                |
+| Field Path                | Type   | Required | Descriptions                                                                                                                                |
 | ------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `input`                   | Object | Yes      | Top-level object containing request data.                                                                                                  |
 | `input.workflow`          | Object | Yes      | The ComfyUI workflow exported in the [required format](#getting-the-workflow-json).                                                        |
