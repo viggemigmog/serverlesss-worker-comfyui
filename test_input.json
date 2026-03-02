@@ -1,49 +1,90 @@
 {
   "input": {
     "workflow": {
+      "28": {
+        "inputs": {
+          "unet_name": "z_image_turbo_bf16.safetensors",
+          "weight_dtype": "default"
+        },
+        "class_type": "UNETLoader",
+        "_meta": { "title": "Load Diffusion Model" }
+      },
+      "30": {
+        "inputs": {
+          "clip_name": "qwen_3_4b.safetensors",
+          "type": "lumina2"
+        },
+        "class_type": "CLIPLoader",
+        "_meta": { "title": "Load CLIP" }
+      },
+      "29": {
+        "inputs": {
+          "vae_name": "ae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": { "title": "Load VAE" }
+      },
+      "11": {
+        "inputs": {
+          "shift": 3,
+          "model": ["28", 0]
+        },
+        "class_type": "ModelSamplingAuraFlow",
+        "_meta": { "title": "ModelSamplingAuraFlow" }
+      },
+      "27": {
+        "inputs": {
+          "text": "a beautiful sunset over mountains, 4k photo",
+          "clip": ["30", 0]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
+      },
+      "33": {
+        "inputs": {
+          "conditioning": ["27", 0]
+        },
+        "class_type": "ConditioningZeroOut",
+        "_meta": { "title": "ConditioningZeroOut" }
+      },
+      "13": {
+        "inputs": {
+          "width": 1024,
+          "height": 1024,
+          "batch_size": 1
+        },
+        "class_type": "EmptySD3LatentImage",
+        "_meta": { "title": "EmptySD3LatentImage" }
+      },
       "3": {
         "inputs": {
-          "seed": 457699577674669,
-          "steps": 3,
-          "cfg": 1.5,
-          "sampler_name": "euler_ancestral",
-          "scheduler": "normal",
+          "seed": 42,
+          "steps": 8,
+          "cfg": 1,
+          "sampler_name": "res_multistep",
+          "scheduler": "simple",
           "denoise": 1,
-          "model": ["4", 0],
-          "positive": ["6", 0],
-          "negative": ["7", 0],
-          "latent_image": ["5", 0]
+          "model": ["11", 0],
+          "positive": ["27", 0],
+          "negative": ["33", 0],
+          "latent_image": ["13", 0]
         },
         "class_type": "KSampler",
         "_meta": { "title": "KSampler" }
       },
-      "4": {
-        "inputs": { "ckpt_name": "sd_xl_turbo_1.0_fp16.safetensors" },
-        "class_type": "CheckpointLoaderSimple",
-        "_meta": { "title": "Load Checkpoint" }
-      },
-      "5": {
-        "inputs": { "width": 1024, "height": 1024, "batch_size": 1 },
-        "class_type": "EmptyLatentImage",
-        "_meta": { "title": "Empty Latent Image" }
-      },
-      "6": {
-        "inputs": { "text": "ancient rome, 4k photo", "clip": ["4", 1] },
-        "class_type": "CLIPTextEncode",
-        "_meta": { "title": "CLIP Text Encode (Prompt)" }
-      },
-      "7": {
-        "inputs": { "text": "text, watermark, blurry, ugly, deformed", "clip": ["4", 1] },
-        "class_type": "CLIPTextEncode",
-        "_meta": { "title": "CLIP Text Encode (Negative)" }
-      },
       "8": {
-        "inputs": { "samples": ["3", 0], "vae": ["4", 2] },
+        "inputs": {
+          "samples": ["3", 0],
+          "vae": ["29", 0]
+        },
         "class_type": "VAEDecode",
         "_meta": { "title": "VAE Decode" }
       },
       "9": {
-        "inputs": { "filename_prefix": "images/rome", "images": ["8", 0] },
+        "inputs": {
+          "filename_prefix": "ComfyUI",
+          "images": ["8", 0]
+        },
         "class_type": "SaveImage",
         "_meta": { "title": "Save Image" }
       }
