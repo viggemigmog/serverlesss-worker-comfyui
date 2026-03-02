@@ -3,10 +3,15 @@
 Setup script for RunPod's cached Hugging Face model (e.g. zimageturbo-minimal).
 
 RunPod downloads the model to /runpod-volume/huggingface-cache/hub/ when you
-set the endpoint's Model field to the Hugging Face repo. This script locates
-the cached snapshot and symlinks each file into ComfyUI's model directories
-(/comfyui/models/...). ComfyUI then reads from the cache path when it opens
-those files — no copy, matching the RunPod example (load from cache path).
+set the endpoint's Model field to the Hugging Face repo. This script:
+
+1. **Stage to local disk** (default): Copy cached files into /comfyui/models/
+   so ComfyUI reads from local disk for faster inference (avoids slow I/O on
+   cache volume). Uses a sentinel to skip re-copy when the same snapshot is
+   already staged.
+
+2. **Symlink only** (COMFYUI_CACHE_SYMLINK_ONLY=true): Symlink into
+   /comfyui/models/ pointing at the cache path (no copy; for debugging).
 
 File mapping (viggemimog/zimageturbo-minimal):
   - zimage_turbo.safetensors     -> models/unet/
@@ -20,13 +25,14 @@ References:
   - https://docs.runpod.io/tutorials/serverless/model-caching-text
 """
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
 
 CACHE_ROOT = Path("/runpod-volume/huggingface-cache/hub")
-# ComfyUI default model path; symlinks here point to the cache so reads use the cache path
 COMFYUI_MODELS_BASE = Path("/comfyui/models")
+SENTINEL_FILE = COMFYUI_MODELS_BASE / ".cached_models_staged"
 
 # Default model when RunPod Model field is set to this repo
 DEFAULT_CACHED_MODEL_ID = "viggemimog/zimageturbo-minimal"
@@ -69,10 +75,46 @@ def resolve_snapshot_path(model_id: str) -> Path | None:
     return None
 
 
+def stage_to_local(snapshot_path: Path) -> int:
+    """
+    Copy cached model files from snapshot to local disk (/comfyui/models).
+    Uses a sentinel file to avoid re-copying when the same snapshot is already staged.
+    Returns the number of files copied (0 if skipped via sentinel).
+    """
+    snapshot_str = str(snapshot_path)
+    if SENTINEL_FILE.exists():
+        try:
+            if SENTINEL_FILE.read_text().strip() == snapshot_str:
+                print("  [cached-model] Sentinel present; skipping copy (already staged).")
+                return 0
+        except OSError:
+            pass
+
+    copied = 0
+    for filename, subdir in FILE_TO_COMFYUI_FOLDER:
+        src = snapshot_path / filename
+        if not src.is_file():
+            continue
+        dest_dir = COMFYUI_MODELS_BASE / subdir
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        tgt = dest_dir / filename
+        shutil.copy2(src, tgt)
+        print(f"  [cached-model] Copied {filename} -> models/{subdir}/ (local disk)")
+        copied += 1
+
+    if copied > 0:
+        COMFYUI_MODELS_BASE.mkdir(parents=True, exist_ok=True)
+        try:
+            SENTINEL_FILE.write_text(snapshot_str)
+        except OSError as e:
+            print(f"  [cached-model] WARNING: could not write sentinel: {e}")
+
+    return copied
+
+
 def setup_symlinks_to_cache(snapshot_path: Path) -> int:
     """
     Symlink each cached file from the snapshot into ComfyUI's model dirs.
-    ComfyUI will read from the cache path when it opens these files (no copy).
     Returns the number of symlinks created.
     """
     linked = 0
@@ -88,13 +130,14 @@ def setup_symlinks_to_cache(snapshot_path: Path) -> int:
         if tgt.exists():
             tgt.unlink()
         tgt.symlink_to(src)
-        print(f"  [cached-model] Linked {filename} -> models/{subdir}/ (reads from cache)")
+        print(f"  [cached-model] Symlinked {filename} -> models/{subdir}/ (reads from cache)")
         linked += 1
     return linked
 
 
 def main() -> None:
     script_start = time.perf_counter()
+    symlink_only = os.environ.get("COMFYUI_CACHE_SYMLINK_ONLY", "").lower() == "true"
     model_id = (
         os.environ.get("MODEL_NAME")
         or os.environ.get("CACHED_MODEL_ID")
@@ -104,9 +147,10 @@ def main() -> None:
     print("=" * 60)
     print("RunPod cached model setup (ComfyUI)")
     print("=" * 60)
-    print(f"  Cache root: {CACHE_ROOT}")
-    print(f"  Model ID:   {model_id}")
-    print(f"  ComfyUI:    {COMFYUI_MODELS_BASE} (symlinks -> cache path)")
+    print(f"  Cache root:    {CACHE_ROOT}")
+    print(f"  Model ID:     {model_id}")
+    print(f"  ComfyUI:      {COMFYUI_MODELS_BASE}")
+    print(f"  Symlink only: {symlink_only} (set COMFYUI_CACHE_SYMLINK_ONLY=true to skip copy)")
 
     if not CACHE_ROOT.exists():
         print("  [cached-model] Cache directory not present; using baked-in models from image (Dockerfile).")
@@ -132,15 +176,21 @@ def main() -> None:
     print(f"  [cached-model] Snapshot path: {snapshot_path}")
 
     step_start = time.perf_counter()
-    count = setup_symlinks_to_cache(snapshot_path)
+    if symlink_only:
+        count = setup_symlinks_to_cache(snapshot_path)
+        if count:
+            print(f"  [cached-model] Symlinked {count} file(s); ComfyUI will load from cache path.")
+        else:
+            print("  [cached-model] No expected files found in cache snapshot.")
+    else:
+        count = stage_to_local(snapshot_path)
+        if count:
+            print(f"  [cached-model] Staged {count} file(s) to local disk; ComfyUI will load from /comfyui/models.")
+        elif not SENTINEL_FILE.exists():
+            print("  [cached-model] No expected files found in cache snapshot.")
+
     step_elapsed = time.perf_counter() - step_start
     total_elapsed = time.perf_counter() - script_start
-
-    if count:
-        print(f"  [cached-model] Linked {count} file(s); ComfyUI will load from cache path.")
-    else:
-        print("  [cached-model] No expected files found in cache snapshot.")
-
     print(f"  [cached-model] Setup took {step_elapsed:.2f}s; total {total_elapsed:.2f}s")
     print("=" * 60)
 

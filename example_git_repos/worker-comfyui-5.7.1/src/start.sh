@@ -4,17 +4,8 @@
 TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
 
-# Force offline mode for Hugging Face (use only cached models, no runtime download)
-# See: https://docs.runpod.io/tutorials/serverless/model-caching-text
-export HF_HUB_OFFLINE=1
-export TRANSFORMERS_OFFLINE=1
-
 # Ensure ComfyUI-Manager runs in offline network mode inside the container
 comfy-manager-set-mode offline || echo "worker-comfyui - Could not set ComfyUI-Manager network_mode" >&2
-
-# Setup cached model (zimageturbo-minimal) from RunPod cache into models/unet, loras, clip, vae
-echo "worker-comfyui: Setting up cached model..."
-python -u /setup_cached_models.py
 
 echo "worker-comfyui: Starting ComfyUI"
 
@@ -24,14 +15,12 @@ echo "worker-comfyui: Starting ComfyUI"
 # Serve the API and don't shutdown the container
 if [ "$SERVE_API_LOCALLY" == "true" ]; then
     python -u /comfyui/main.py --disable-auto-launch --disable-metadata --listen --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
-else
-    python -u /comfyui/main.py --disable-auto-launch --disable-metadata --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
-fi
 
-# Start handler immediately; it will retry until ComfyUI is reachable (check_server in handler.py).
-echo "worker-comfyui: Starting RunPod Handler"
-if [ "$SERVE_API_LOCALLY" == "true" ]; then
+    echo "worker-comfyui: Starting RunPod Handler"
     python -u /handler.py --rp_serve_api --rp_api_host=0.0.0.0
 else
+    python -u /comfyui/main.py --disable-auto-launch --disable-metadata --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
+
+    echo "worker-comfyui: Starting RunPod Handler"
     python -u /handler.py
 fi
